@@ -1,0 +1,16 @@
+{
+  "name": "wp-plugin-boilerplate",
+  "version": "0.1.0",
+  "description": "A plugin for WordPress",
+  "license": "GPL-2.0-or-later",
+  "private": true,
+  "devDependencies": {
+    "@symfony/webpack-encore": "^1",
+    "postcss-loader": "^6.2.1",
+    "sass": "^1.49.0",
+    "sass-loader": "^12.4.0",
+    "vue": "^3.2.33",
+    "vue-loader": "^16.7.0"
+  },
+  "dependencies": {}
+}
