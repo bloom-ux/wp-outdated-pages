@@ -30,6 +30,16 @@ export default {
 		};
 	},
 	methods: {
+		toggleAll() {
+			if ( this.allChecked() ) {
+				this.checked = [];
+			} else {
+				this.checked = this.items.map( item => item.id );
+			}
+		},
+		allChecked() {
+			return this.checked.length === this.items.length;
+		},
 		toggleSort( column ) {
 			const currentParams = JSON.parse( JSON.stringify( this.query ) );
 			// cambiar modo de ordenar
@@ -155,6 +165,11 @@ export default {
 		</ul>
 		<div class="tablenav top">
 			<div class="alignleft actions bulkactions">
+				<select v-model="this.query.per_page">
+					<option v-bind:value="25">25</option>
+					<option v-bind:value="50">50</option>
+					<option v-bind:value="100">100</option>
+				</select>
 				<button
 					class="button-secondary"
 					type="button"
@@ -166,7 +181,7 @@ export default {
 					v-bind:disabled="! checked.length"
 					v-on:click="deleteCheckedPages()"
 				>
-					Enviar a papelera páginas seleccionadas
+					Enviar a papelera {{ this.checked.length }} {{ this.checked.length === 1 ? 'página' : 'páginas' }} seleccionadas
 				</button>
 			</div>
 			<h2 class="screen-reader-text">Navegación por el listado de páginas</h2>
@@ -204,6 +219,11 @@ export default {
 			<thead>
 				<tr>
 					<th class="check-column">
+						<input
+							type="checkbox"
+							v-on:click="toggleAll()"
+							v-bind:checked="allChecked()"
+						>
 						<span class="screen-reader-text">Seleccionar</span>
 					</th>
 					<th class="column-title">Página</th>
@@ -306,6 +326,15 @@ export default {
 		text-decoration: none !important;
 	}
 }
+.tablenav {
+	&.top {
+		background: #f0f0f1;
+		position: sticky;
+		top: 32px;
+		z-index: 9;
+		padding: 10px 0;
+	}
+}
 .widefat {
 	max-width: 100%;
 	transition: all .25s linear;
@@ -348,6 +377,10 @@ export default {
 	}
 	tbody {
 		tr {
+			td,
+			th {
+				transition: all .35s linear !important;
+			}
 			&:hover {
 				cursor: pointer;
 				td,
@@ -360,6 +393,9 @@ export default {
 				th {
 					background: var( --color--danger--background );
 					box-shadow: inset 0 -1px rgba( 0, 0, 0, .05 );
+				}
+				input[type="checkbox"]:checked::before {
+					filter: hue-rotate(150deg);
 				}
 			}
 		}
@@ -401,5 +437,11 @@ export default {
 }
 .button-trash {
 	border-color: var( --color--danger );
+	transition: all .25s linear;
+	&:hover {
+		background: var( --color--danger );
+		border-color: var( --color-danger );
+		color: white;
+	}
 }
 </style>
