@@ -3,12 +3,31 @@
 
 import { defineComponent } from "vue";
 
+/**
+ * How many items show per page
+ */
 const PER_PAGE = 25;
+
+/**
+ * The current date and time
+ */
 const nowTime = new Date();
+
+/**
+ * An internationalized relative time formatter
+ */
 const rtf = new Intl.RelativeTimeFormat( 'es', {
 	numeric: 'auto'
 } );
+
+/**
+ * An internationalized date time formatter
+ */
 const dateFormatter = new Intl.DateTimeFormat('es');
+
+/**
+ * The refresh data interval for link checks
+ */
 let refreshDataInterval;
 
 export default defineComponent( {
@@ -42,6 +61,10 @@ export default defineComponent( {
 		};
 	},
 	methods: {
+
+		/**
+		 * Select or deselect all checkboxes
+		 */
 		toggleAll() {
 			if ( this.allChecked() ) {
 				this.checked = [];
@@ -49,12 +72,21 @@ export default defineComponent( {
 				this.checked = this.items.map( item => item.id );
 			}
 		},
+
+		/**
+		 * Indicate whether all checkboxes are selected
+		 */
 		allChecked() {
 			return this.checked.length === this.items.length;
 		},
+
+		/**
+		 * Change the way results are ordered
+		 * @param {String} column Name of the column/orderby
+		 */
 		toggleSort( column ) {
 			const currentParams = JSON.parse( JSON.stringify( this.query ) );
-			// cambiar modo de ordenar
+			// Toggle ascending/descending order
 			let newOrder = this.query.order;
 			if ( column === this.query.orderby ) {
 				newOrder = this.query.order === 'asc' ? 'desc' : 'asc';
@@ -62,6 +94,11 @@ export default defineComponent( {
 			const newOrderBy = column;
 			this.query = { ...currentParams, ...{ orderby: newOrderBy, order: newOrder } };
 		},
+
+		/**
+		 * Get the page edit URL
+		 * @param {Number} itemID Page ID
+		 */
 		getEditLink( itemID ) {
 			const editBaseURL = new URL( Outdated_Pages.baseEditUri );
 			const editURLParams = new URLSearchParams({
@@ -71,6 +108,11 @@ export default defineComponent( {
 			editBaseURL.search = editURLParams.toString();
 			return editBaseURL;
 		},
+
+		/**
+		 * Check/uncheck a given page
+		 * @param {Number} itemID Page ID
+		 */
 		toggleRow( itemID ) {
 			if ( this.isSelected( itemID ) ) {
 				this.checked = this.checked.filter( id => id !== itemID );
@@ -78,16 +120,31 @@ export default defineComponent( {
 				this.checked.push( itemID );
 			}
 		},
+
+		/**
+		 * Get localized datetime
+		 * @param {String} time ISO-8601 formatted datetime string
+		 */
 		formattedDate( time ) {
 			const theDate = new Date( time );
 			return dateFormatter.format( theDate );
 		},
+
+		/**
+		 * Get localized relative time difference
+		 * @param {String} time ISO-8601 formatted datetime string to compare
+		 */
 		getTimeDiff( time ) {
 			const pastTime = new Date( time );
 			const daysAgo = Math.round( ( pastTime - nowTime ) / 1000 / 60 / 60 / 24 );
 			return rtf.format( daysAgo , 'days' );
 
 		},
+
+		/**
+		 * Get the author name
+		 * @param {Object} item The full api response item, including embedded data
+		 */
 		getAuthor( item ) {
 			const author = item?._embedded?.author?.[0];
 			if ( ! author ) {
@@ -95,9 +152,18 @@ export default defineComponent( {
 			}
 			return author.name;
 		},
+
+		/**
+		 * Delete a single page by ID
+		 * @param {Number} itemID Page ID to delete
+		 */
 		deletePage( itemID ) {
 			this.doDeletePages( [ itemID ] );
 		},
+
+		/**
+		 * Delete all selected pages
+		 */
 		deleteCheckedPages(  ) {
 			const deleteIds = [ ...this.checked ];
 			this.currentAction = 'delete';
@@ -107,6 +173,11 @@ export default defineComponent( {
 				}
 			);
 		},
+
+		/**
+		 * Send an ajax request to delete the given pages
+		 * @param {Array} itemIds The page IDs
+		 */
 		doDeletePages( itemIds ) {
 			const requestUri = new URL( Outdated_Pages.ajaxDeleteEndpoint );
 			requestUri.searchParams.set('ids', itemIds );
@@ -118,16 +189,16 @@ export default defineComponent( {
 				resp => resp.json()
 			).then(
 				data => {
-					// deleted: ids de páginas enviadas a papelera.
+					// deleted: contains the trashed pages ids
 					data.data.deleted.map( item => {
 						if ( this.deleted.indexOf( item ) === -1 ) {
 							this.deleted.push( item );
 						}
 					} );
-					// disminuir cantidad de páginas totales
+					// decrease the number of pages
 					this.total = this.total - data.data.deleted.length;
 
-					// recalcular cantidad de páginas disponibles
+					// recalculate the number of pages pages
 					this.totalPages = Math.ceil( this.total / PER_PAGE );
 				}
 			).finally(
@@ -139,32 +210,62 @@ export default defineComponent( {
 			);
 
 		},
+
+		/**
+		 * Check if the given page was deleted
+		 * @param {Number} itemID Page ID
+		 */
 		isDeleted( itemID ) {
 			return this.deleted.indexOf( itemID ) !== -1;
 		},
+
+		/**
+		 * Check if the given page is checked
+		 * @param {Number} itemID Page ID
+		 */
 		isSelected( itemID ) {
 			return this.checked.indexOf( itemID ) !== -1;
 		},
+
+		/**
+		 * Go to the first page of results
+		 */
 		firstPage() {
 			if ( ! this.isLoading && this.query.page !== 1 ) {
 				this.query.page = 1;
 			}
 		},
+
+		/**
+		 * Go to the previous page of results
+		 */
 		previousPage() {
 			if ( ! this.isLoading && this.query.page > 1 ) {
 				this.query.page = this.query.page - 1;
 			}
 		},
+
+		/**
+		 * Go to the next results page
+		 */
 		nextPage() {
 			if ( ! this.isLoading && this.query.page < this.totalPages ) {
 				this.query.page = this.query.page + 1;
 			}
 		},
+
+		/**
+		 * Go to the last page of results
+		 */
 		lastPage() {
 			if ( ! this.isLoading && this.query.page !== this.totalPages ) {
 				this.query.page = this.totalPages;
 			}
 		},
+
+		/**
+		 * Reload items with present query parameters
+		 */
 		triggerReload() {
 			this.isWorking = true;
 			this.currentAction = 'reload';
@@ -174,6 +275,10 @@ export default defineComponent( {
 				this.showReload = false;
 			} );
 		},
+
+		/**
+		 * Start a links check process
+		 */
 		triggerCheckLinks() {
 			const requestUri = new URL( Outdated_Pages.ajaxCheckLinksEndpoint );
 			const pageIds = this.items.reduce( ( carry, item ) => {
@@ -202,6 +307,10 @@ export default defineComponent( {
 				}
 			);
 		},
+
+		/**
+		 * Get the current status of the link checker process
+		 */
 		checkStatus() {
 			window.fetch( Outdated_Pages.ajaxCheckStatusEndpoint )
 			.then( resp => resp.json() )
@@ -215,6 +324,10 @@ export default defineComponent( {
 				}
 			);
 		},
+
+		/**
+		 * Get pages data from the WP API
+		 */
 		loadItems() {
 			const requestUri = new URL( Outdated_Pages.requestUri );
 			const requestParams = new URLSearchParams( this.query );
@@ -604,11 +717,6 @@ export default defineComponent( {
 					filter: grayscale( 1 );
 					text-decoration: none !important;
 					cursor: default;
-				}
-			}
-			&.checking {
-				.column-status {
-
 				}
 			}
 			.column-status {
