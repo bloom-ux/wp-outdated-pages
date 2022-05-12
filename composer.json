@@ -42,5 +42,8 @@
         "platform": {
             "php": "7.2.24"
         }
-    }
+    },
+	"extra": {
+		"installer-name": "bloom-ux-outdated-pages"
+	}
 }
