@@ -1,9 +1,14 @@
 {
-    "name": "bloom-ux/wp-plugin-template",
-    "description": "Basic template for WordPress plugins",
+    "name": "bloom-ux/wp-outdated-pages",
+    "description": "Add an admin sub-menu to list and delete pages outdated very far in the past.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "authors": [
+		{
+			"name": "Felipe Lavín",
+			"email": "felipe@bloom-ux.com",
+			"homepage": "https://www.bloom-ux.com"
+		}
     ],
     "autoload": {
         "classmap": [
