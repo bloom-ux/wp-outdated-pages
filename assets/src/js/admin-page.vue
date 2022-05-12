@@ -1,30 +1,42 @@
 <script>
 /* global Outdated_Pages */
 
+import { defineComponent } from "vue";
+
+const PER_PAGE = 25;
 const nowTime = new Date();
 const rtf = new Intl.RelativeTimeFormat( 'es', {
 	numeric: 'auto'
 } );
 const dateFormatter = new Intl.DateTimeFormat('es');
+let refreshDataInterval;
 
-export default {
+export default defineComponent( {
 	beforeMount() {
 		this.modifiedYearsAgo = 2;
 	},
 	data() {
 		return {
+			PER_PAGE: PER_PAGE,
 			isLoading: false,
+			isWorking: false,
+			isCountingLinks: false,
+			showReload: false,
+			currentAction: '',
 			total: 0,
 			totalPages: 0,
 			items: [],
 			checked: [],
+			deleted: [],
+			workingOn: [],
+			hasLinks: {},
 			modifiedYearsAgo: 0,
 			query: {
 				orderby: 'modified',
 				order: 'asc',
 				_fields: 'id,title,date,modified,link,status,parent,author,_links',
 				_embed: 1,
-				per_page: 25,
+				per_page: PER_PAGE,
 				page: 1
 			}
 		};
@@ -83,8 +95,52 @@ export default {
 			}
 			return author.name;
 		},
-		deleteCheckedPages( ) {
-			// @todo
+		deletePage( itemID ) {
+			this.doDeletePages( [ itemID ] );
+		},
+		deleteCheckedPages(  ) {
+			const deleteIds = [ ...this.checked ];
+			this.currentAction = 'delete';
+			this.doDeletePages( deleteIds ).then(
+				() => {
+					this.checked = [];
+				}
+			);
+		},
+		doDeletePages( itemIds ) {
+			const requestUri = new URL( Outdated_Pages.ajaxDeleteEndpoint );
+			requestUri.searchParams.set('ids', itemIds );
+			this.isWorking = true;
+			this.workingOn = [ ...itemIds ];
+			return window.fetch(
+				requestUri
+			).then(
+				resp => resp.json()
+			).then(
+				data => {
+					// deleted: ids de páginas enviadas a papelera.
+					data.data.deleted.map( item => {
+						if ( this.deleted.indexOf( item ) === -1 ) {
+							this.deleted.push( item );
+						}
+					} );
+					// disminuir cantidad de páginas totales
+					this.total = this.total - data.data.deleted.length;
+
+					// recalcular cantidad de páginas disponibles
+					this.totalPages = Math.ceil( this.total / PER_PAGE );
+				}
+			).finally(
+				() => {
+					this.isWorking = false;
+					this.workingOn = [];
+					this.currentAction = '';
+				}
+			);
+
+		},
+		isDeleted( itemID ) {
+			return this.deleted.indexOf( itemID ) !== -1;
 		},
 		isSelected( itemID ) {
 			return this.checked.indexOf( itemID ) !== -1;
@@ -108,6 +164,79 @@ export default {
 			if ( ! this.isLoading && this.query.page !== this.totalPages ) {
 				this.query.page = this.totalPages;
 			}
+		},
+		triggerReload() {
+			this.isWorking = true;
+			this.currentAction = 'reload';
+			this.loadItems().then( () => {
+				this.isWorking = false;
+				this.currentAction = '';
+				this.showReload = false;
+			} );
+		},
+		triggerCheckLinks() {
+			const requestUri = new URL( Outdated_Pages.ajaxCheckLinksEndpoint );
+			const pageIds = this.items.reduce( ( carry, item ) => {
+				if ( this.deleted.indexOf( item.id ) === -1 ) {
+					carry.push( item.id );
+				}
+				return carry;
+			}, [] );
+			requestUri.searchParams.set('ids', pageIds);
+			if ( ! pageIds.length ) {
+				alert( 'Carga más resultados para buscar enlaces' );
+			}
+			this.isCountingLinks = true;
+			window.fetch(
+				requestUri
+			).then(
+				resp => resp.json()
+			).then(
+				data => {
+					refreshDataInterval = window.setInterval(
+						() => {
+							this.checkStatus();
+						},
+						2500
+					);
+				}
+			);
+		},
+		checkStatus() {
+			window.fetch( Outdated_Pages.ajaxCheckStatusEndpoint )
+			.then( resp => resp.json() )
+			.then(
+				data => {
+					this.hasLinks = data.data.has_links ? { ...data.data.has_links } : {};
+					if ( data.data.status === 'finished' ) {
+						this.isCountingLinks = false;
+						clearInterval( refreshDataInterval );
+					}
+				}
+			);
+		},
+		loadItems() {
+			const requestUri = new URL( Outdated_Pages.requestUri );
+			const requestParams = new URLSearchParams( this.query );
+			requestUri.search = requestParams.toString();
+			this.isLoading = true;
+			return window.fetch(
+				requestUri
+			).then(
+				resp => {
+					this.total = parseInt( resp.headers.get('x-wp-total'), 10 );
+					this.totalPages = parseInt( resp.headers.get('x-wp-totalpages'), 10 );
+					return resp.json();
+				}
+			).then(
+				data => {
+					this.items = data;
+				}
+			).finally( () =>{
+				this.checked = [];
+				this.deleted = [];
+				this.isLoading = false;
+			} );
 		}
 	},
 	watch: {
@@ -121,31 +250,18 @@ export default {
 		},
 		query: {
 			deep: true,
-			handler( newQuery ) {
-				const requestUri = new URL( Outdated_Pages.requestUri );
-				const requestParams = new URLSearchParams( this.query );
-				requestUri.search = requestParams.toString();
-				this.isLoading = true;
-				window.fetch(
-					requestUri
-				).then(
-					resp => {
-						this.total = parseInt( resp.headers.get('x-wp-total'), 10 );
-						this.totalPages = parseInt( resp.headers.get('x-wp-totalpages'), 10 );
-						return resp.json();
-					}
-				).then(
-					data => {
-						this.items = data;
-					}
-				).finally( () =>{
-					this.checked = [];
-					this.isLoading = false;
-				} );
+			handler() {
+				this.loadItems();
+			}
+		},
+		deleted: {
+			deep: true,
+			handler() {
+				this.showReload = this.deleted.length === this.items.length && this.query.page < this.totalPages;
 			}
 		}
 	}
-}
+} );
 </script>
 
 <template>
@@ -166,23 +282,49 @@ export default {
 		<div class="tablenav top">
 			<div class="alignleft actions bulkactions">
 				<select v-model="this.query.per_page">
-					<option v-bind:value="25">25</option>
-					<option v-bind:value="50">50</option>
-					<option v-bind:value="100">100</option>
-				</select>
-				<button
-					class="button-secondary"
+					<option v-for="n in 4" v-bind:key="n" v-bind:value="PER_PAGE * n">{{ PER_PAGE * n }}</option>
+				</select> <button
+					v-bind:class="[
+						'button-secondary',
+						isCountingLinks ? 'button-is-working' : ''
+					]"
+					v-on:click="triggerCheckLinks()"
+					v-bind:disabled="this.deleted.length === this.items.length"
 					type="button"
 				>
-					Verificar enlaces
+					<template v-if="isCountingLinks">
+						Verificando enlaces&hellip;
+					</template>
+					<template v-else>
+						Verificar enlaces
+					</template>
 				</button> <button
-					class="button-secondary button-trash"
+					v-bind:class="[
+						'button button-trash',
+						isWorking && currentAction === 'delete' ? 'button-is-working' : ''
+					]"
 					type="button"
 					v-bind:disabled="! checked.length"
 					v-on:click="deleteCheckedPages()"
 				>
-					Enviar a papelera {{ this.checked.length }} {{ this.checked.length === 1 ? 'página' : 'páginas' }} seleccionadas
-				</button>
+					<template v-if="this.checked.length === 0">
+						Selecciona 1 o más páginas para eliminar
+					</template>
+					<template v-else-if="this.checked.length === 1">
+						Enviar a papelera la página seleccionada
+					</template>
+					<template v-else>
+						Enviar a papelera las {{ this.checked.length }} páginas seleccionadas
+					</template>
+				</button> <button
+					v-if="showReload"
+					v-bind:class="[
+						'button button-link',
+						'button-reload'
+					]"
+					type="button"
+					v-on:click="triggerReload()"
+				> Cargar más resultados</button>
 			</div>
 			<h2 class="screen-reader-text">Navegación por el listado de páginas</h2>
 			<div class="tablenav-pages">
@@ -223,6 +365,7 @@ export default {
 							type="checkbox"
 							v-on:click="toggleAll()"
 							v-bind:checked="allChecked()"
+							v-bind:disabled="this.deleted.length === this.items.length"
 						>
 						<span class="screen-reader-text">Seleccionar</span>
 					</th>
@@ -233,6 +376,7 @@ export default {
 						this.query.orderby === 'date' && this.query.order === 'desc' ? 'desc' : ''
 					]"
 						v-on:click="toggleSort('date')"
+						title="Ordenar por fecha de publicación"
 					>
 						<span>Publicada</span>
 						<span v-if="this.query.orderby === 'date'" class="sorting-indicator"></span>
@@ -243,23 +387,34 @@ export default {
 						this.query.orderby === 'modified' && this.query.order === 'asc' ? 'asc' : ''
 					]"
 						v-on:click="toggleSort('modified')"
+						title="Ordenar por fecha de última actualización"
 					>
 						<span>Última actualización</span>
 						<span v-if="this.query.orderby === 'modified'" class="sorting-indicator"></span>
 					</th>
 					<th>Autor/a</th>
-					<th>Enlaces entrantes</th>
+					<th style="width:10em;text-align:center">Enlaces entrantes</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr
 					v-for="item in items"
 					:key="item.id"
-					v-bind:class="[ isSelected( item.id ) ? 'selected' : '' ]"
+					v-bind:class="[
+						isSelected( item.id ) ? 'selected' : '',
+						isDeleted( item.id ) ? 'deleted' : '',
+						isWorking && workingOn.indexOf( item.id ) !== -1 ? 'working' : '',
+						isCountingLinks && typeof hasLinks[ item.id ] === 'undefined' ? 'checking' : ''
+					]"
 					v-on:click="toggleRow( item.id )"
 				>
 					<td class="check-column">
-						<input type="checkbox" v-bind:id="'page-check--'+item.id" v-model="checked" v-bind:value="item.id">
+						<template v-if="isDeleted( item.id )">
+							<span class="dashicons dashicons-trash"></span>
+						</template>
+						<template v-else>
+							<input type="checkbox" v-bind:id="'page-check--'+item.id" v-model="checked" v-bind:value="item.id">
+						</template>
 					</td>
 					<td class="title column-title">
 						<label v-bind:for="'page-check--'+item.id" v-on:click.prevent="">
@@ -274,7 +429,7 @@ export default {
 								<a :href="getEditLink( item.id )" class="row-action">Editar</a>
 							</span>
 							<span class="trash">
-								<button type="button" class="row-action">Enviar a papelera</button>
+								<button type="button" class="row-action" v-on:click.stop.prevent="deletePage( item.id )">Enviar a papelera</button>
 							</span>
 						</div>
 					</td>
@@ -289,8 +444,17 @@ export default {
 					<td>
 						{{ getAuthor( item ) }}
 					</td>
-					<td>
-						<span class="dashicons dashicons-cross"></span>
+					<td class="column-status">
+						<template v-if="typeof hasLinks[ item.id ] !== 'undefined' && hasLinks[ item.id ]">
+							<span class="dashicons dashicons-yes-alt"></span>
+							<br> Existe enlaces desde otros contenidos a esta página.
+						</template>
+						<template v-else-if="typeof hasLinks[ item.id ] !== 'undefined' && ! hasLinks[ item.id ]">
+							<span class="dashicons dashicons-dismiss"></span>
+						</template>
+						<template v-else-if="isCountingLinks && typeof hasLinks[ item.id ] === 'undefined'">
+							<span v-bind:class="['spinner', 'is-active']"></span>
+						</template>
 					</td>
 				</tr>
 			</tbody>
@@ -369,6 +533,11 @@ export default {
 				display: flex;
 				align-items: center;
 			}
+			&.check-column {
+				input {
+					margin: 0;
+				}
+			}
 			.sorting-indicator {
 				display: inline-block;
 				margin-top: 0;
@@ -397,6 +566,54 @@ export default {
 				input[type="checkbox"]:checked::before {
 					filter: hue-rotate(150deg);
 				}
+			}
+			&.deleted {
+				td,
+				th {
+					opacity: .5;
+				}
+				.check-column::after {
+					display: none !important;
+				}
+				.row-actions {
+					visibility: hidden !important;
+				}
+			}
+			&.working {
+				td,
+				th {
+					background: var( --color--danger--background );
+				}
+				.check-column {
+					&::after {
+						content: '';
+						display: inline-block;
+						width: 1em;
+						height: 1em;
+						border: 2px solid var( --color--danger );
+						border-top-color: transparent;
+						border-radius: 1em;
+						animation: rotation infinite 650ms linear;
+					}
+					input {
+						display: none;
+					}
+				}
+				.row-action {
+					pointer-events: none;
+					filter: grayscale( 1 );
+					text-decoration: none !important;
+					cursor: default;
+				}
+			}
+			&.checking {
+				.column-status {
+
+				}
+			}
+			.column-status {
+				text-align: center;
+				vertical-align: middle;
 			}
 		}
 		td {
@@ -434,14 +651,34 @@ export default {
 .button-trash,
 .trash button {
 	color: var( --color--danger );
+
 }
 .button-trash {
 	border-color: var( --color--danger );
 	transition: all .25s linear;
-	&:hover {
+	&:focus,
+	&:hover,
+	&.button-is-working {
 		background: var( --color--danger );
-		border-color: var( --color-danger );
+		border-color: var( --color--danger ) !important;
 		color: white;
+	}
+	&:focus {
+		box-shadow: 0 0 0 1px var( --color--danger--background );
+	}
+}
+.button-is-working {
+	&::after {
+		content: '';
+		display: inline-block;
+		width: 1ex;
+		height: 1ex;
+		border: 1px solid currentColor;
+		border-top-color: transparent;
+		border-radius: 1em;
+		margin-left: .5ex;
+		position: relative;
+		animation: rotation infinite 450ms linear;
 	}
 }
 </style>

@@ -2,10 +2,8 @@
 
 namespace Bloom_UX\Outdated_Pages;
 
-use Queulat\Helpers\Abstract_Admin;
 use WP_Query;
-use WP_REST_Request;
-use WP_REST_Server;
+use Queulat\Helpers\Abstract_Admin;
 
 class Admin_Page extends Abstract_Admin {
 
@@ -14,18 +12,6 @@ class Admin_Page extends Abstract_Admin {
 	public function init() {
 		parent::init();
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_enqueue_scripts' ) );
-		add_action( 'wp_ajax_outdated_pages', array( $this, 'ajax_get_outdated_pages' ) );
-	}
-
-	public function ajax_get_outdated_pages() {
-		$request = new WP_REST_Request(
-			WP_REST_Server::READABLE,
-			'/wp/v2/pages'
-		);
-		$rest_server = rest_get_server();
-		$response = $rest_server->dispatch( $request );
-		echo json_encode( $response );
-		exit;
 	}
 
 	public function admin_enqueue_scripts() {
@@ -71,7 +57,9 @@ class Admin_Page extends Abstract_Admin {
 		$data = array(
 			'requestUri' => rest_url( '/wp/v2/pages' ),
 			'baseEditUri' => admin_url( 'post.php' ),
-			'ajaxDeleteEndpoint' => add_query_arg( 'action', 'outdated-pages__delete', admin_url( 'admin-ajax.php' ) )
+			'ajaxDeleteEndpoint' => add_query_arg( 'action', 'outdated-pages__delete', admin_url( 'admin-ajax.php' ) ),
+			'ajaxCheckLinksEndpoint' => add_query_arg( 'action', 'outdated-pages__check-links', admin_url( 'admin-ajax.php' ) ),
+			'ajaxCheckStatusEndpoint' => add_query_arg( 'action', 'outdated-pages__check-status', admin_url( 'admin-ajax.php' ) )
 		);
 		return $data;
 	}
