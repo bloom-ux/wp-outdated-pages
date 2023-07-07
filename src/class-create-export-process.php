@@ -156,12 +156,10 @@ Revisa la lista de páginas desactualizadas en el archivo adjunto a este correo.
 	 */
 	private function generate_export() : string {
 		$params  = array(
-			array(
-				'date_query' => array(
-					array(
-						'column' => 'post_modified_gmt',
-						'before' => $this->before,
-					),
+			'date_query' => array(
+				array(
+					'column' => 'post_modified_gmt',
+					'before' => $this->before,
 				),
 			),
 		);
