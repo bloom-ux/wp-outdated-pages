@@ -23,7 +23,7 @@ class Create_Export_Process extends WP_Background_Process {
 	 *
 	 * @var string
 	 */
-	protected $action = 'bop_create_export';
+	protected $action = 'b_op_create_export';
 
 	/**
 	 * Hold the current run ID
@@ -168,11 +168,11 @@ Revisa la lista de páginas desactualizadas en el archivo adjunto a este correo.
 		$fp      = fopen( 'php://temp/maxmemory:' . ( 12 * 1024 * 1024 ), 'r+' );
 		$headers = array(
 			'ID',
-			'Title',
-			'Published',
-			'Updated',
-			'Author E-mail',
-			'Has references',
+			'Título',
+			'Fecha publicación',
+			'Última actualización',
+			'E-mail autor',
+			'Tiene enlaces entrantes',
 		);
 		fputcsv( $fp, $headers );
 		$entries    = $this->get_export_entries( $params );
@@ -220,7 +220,7 @@ Revisa la lista de páginas desactualizadas en el archivo adjunto a este correo.
 			'post_type'      => 'page',
 			'orderby'        => 'modified',
 			'order'          => 'ASC',
-			'posts_per_page' => 5,
+			'posts_per_page' => -1, // 	phpcs:ignore
 			'post_status'    => 'publish',
 			'lang'           => '',
 		);

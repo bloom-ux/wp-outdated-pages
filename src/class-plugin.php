@@ -27,17 +27,25 @@ class Plugin {
 	 *
 	 * @var Check_Links_Process
 	 */
-	private $check_links_process;
+	public $check_links_process;
 
 	/**
 	 * Instance of the create export process
 	 *
 	 * @var Create_Export_Process
 	 */
-	private $create_export_process;
+	public $create_export_process;
+
+	/**
+	 * Instance of the async export task
+	 *
+	 * @var Async_Export_Task
+	 */
+	public $async_export_task;
 
 	/**
 	 * Indicates whether the plugin was initialized
+	 *
 	 * @var false
 	 */
 	private static $was_initialized = false;
@@ -60,9 +68,11 @@ class Plugin {
 		require __DIR__ . '/class-admin-page.php';
 		require __DIR__ . '/class-check-links-process.php';
 		require __DIR__ . '/class-create-export-process.php';
+		require __DIR__ . '/class-async-export-task.php';
 		$this->admin_page            = new Admin_Page();
 		$this->check_links_process   = new Check_Links_Process();
 		$this->create_export_process = new Create_Export_Process();
+		$this->async_export_task     = new Async_Export_Task();
 		$this->admin_page->init();
 		add_action( 'wp_ajax_outdated-pages__delete', array( $this, 'ajax_delete_pages' ) );
 		add_action( 'wp_ajax_outdated-pages__check-links', array( $this, 'ajax_check_links' ) );
@@ -104,34 +114,20 @@ class Plugin {
 	 * @return void
 	 */
 	public function ajax_create_export() {
-		$user           = get_user_by( 'id', filter_input( INPUT_GET, 'user_id', FILTER_SANITIZE_NUMBER_INT ) );
-		$before         = filter_input( INPUT_GET, 'before', FILTER_SANITIZE_STRING );
-		$export_entries = Create_Export_Process::get_export_entries(
+		$user   = get_user_by( 'id', filter_input( INPUT_GET, 'user_id', FILTER_SANITIZE_NUMBER_INT ) );
+		$before = filter_input( INPUT_GET, 'before', FILTER_SANITIZE_STRING );
+		$run_id = bin2hex( openssl_random_pseudo_bytes( 16 ) );
+		$this->async_export_task->data(
 			array(
-				'date_query' => array(
-					array(
-						'column' => 'post_modified_gmt',
-						'before' => $before,
-					),
-				),
+				'user_id' => $user->ID,
+				'run_id'  => $run_id,
+				'before'  => $before,
 			)
 		);
-		$run_id         = md5( wp_json_encode( $export_entries->query_vars ) );
-		foreach ( $export_entries->posts as $entry ) {
-			$this->create_export_process->push_to_queue(
-				array(
-					'user_id' => $user->ID,
-					'run_id'  => $run_id,
-					'post_id' => $entry->ID,
-					'before'  => $before,
-				)
-			);
-		}
-		$this->create_export_process->save()->dispatch();
+		$this->async_export_task->dispatch();
 		wp_send_json_success(
 			array(
-				'email'      => $user->user_email,
-				'page_count' => $export_entries->post_count,
+				'run_id' => $run_id,
 			)
 		);
 	}

@@ -41,6 +41,7 @@ export default defineComponent( {
 			isWorking: false,
 			isCountingLinks: false,
 			isCreatingExport: false,
+			canCreateExport: true,
 			showReload: false,
 			currentAction: '',
 			total: 0,
@@ -324,6 +325,7 @@ export default defineComponent( {
 			).then(
 				data => {
 					this.isCreatingExport = false;
+					this.canCreateExport = false;
 					alert('El proceso de exportación ha comenzado. Enviaremos el archivo a tu correo en algunos minutos.');
 				}
 			);
@@ -419,7 +421,7 @@ export default defineComponent( {
 					type="button"
 					v-bind:class="['button', 'button-secondary', isCreatingExport ? 'button-is-working' : '' ]"
 					v-on:click="triggerCreateExport()"
-					v-bind:disabled="! this.items.length || this.deleted.length === this.items.length"
+					v-bind:disabled="! canCreateExport || ! this.items.length"
 				>
 					<template v-if="isCreatingExport">
 						Generando exportación&hellip;
