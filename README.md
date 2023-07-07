@@ -13,3 +13,5 @@ Install with composer.
 Get js dependencies and build the vue client used for the admin panel with:
 
 `yarn install && npx encore production`
+
+Go to your WordPress admin panel and search within the "Pages" menu.

@@ -40,6 +40,7 @@ export default defineComponent( {
 			isLoading: false,
 			isWorking: false,
 			isCountingLinks: false,
+			isCreatingExport: false,
 			showReload: false,
 			currentAction: '',
 			total: 0,
@@ -309,6 +310,26 @@ export default defineComponent( {
 		},
 
 		/**
+		 * Start a create export process
+		 */
+		triggerCreateExport() {
+			const requestUri = new URL( Outdated_Pages.ajaxCreateExportEndpoint );
+			requestUri.searchParams.set( 'before', this.query.modified_before );
+			requestUri.searchParams.set( 'user_id', userSettings.uid );
+			this.isCreatingExport = true;
+			window.fetch(
+				requestUri
+			).then(
+				resp => resp.json()
+			).then(
+				data => {
+					this.isCreatingExport = false;
+					alert('El proceso de exportación ha comenzado. Enviaremos el archivo a tu correo en algunos minutos.');
+				}
+			);
+		},
+
+		/**
 		 * Get the current status of the link checker process
 		 */
 		checkStatus() {
@@ -382,16 +403,33 @@ export default defineComponent( {
 		<h1 class="wp-heading-inline">Páginas desactualizadas</h1>
 		<span v-bind:class="['spinner', isLoading ? 'is-active' : '']"></span>
 		<hr class="wp-header-end">
-		<ul class="subsubsub">
-			<li>
-				Última actualización:
-			</li>
-			<li v-for="n in 3" :key="n">
-				<span v-bind:class="['filter-list', modifiedYearsAgo === n ? 'current' : '' ]" v-on:click="this.modifiedYearsAgo = n">
-					Hace {{ n }} <template v-if="n > 1">años</template><template v-else>año</template> o más
-				</span><span v-if="n < 3"> | </span>
-			</li>
-		</ul>
+		<div class="wp-header-sub">
+			<ul class="subsubsub">
+				<li>
+					Última actualización:
+				</li>
+				<li v-for="n in 3" :key="n">
+					<span v-bind:class="['filter-list', modifiedYearsAgo === n ? 'current' : '' ]" v-on:click="this.modifiedYearsAgo = n">
+						Hace {{ n }} <template v-if="n > 1">años</template><template v-else>año</template> o más
+					</span><span v-if="n < 3"> | </span>
+				</li>
+			</ul>
+			<div class="more-buttons">
+				<button
+					type="button"
+					v-bind:class="['button', 'button-secondary', isCreatingExport ? 'button-is-working' : '' ]"
+					v-on:click="triggerCreateExport()"
+					v-bind:disabled="! this.items.length || this.deleted.length === this.items.length"
+				>
+					<template v-if="isCreatingExport">
+						Generando exportación&hellip;
+					</template>
+					<template v-else>
+						Generar exportación a Excel
+					</template>
+				</button>
+			</div>
+		</div>
 		<div class="tablenav top">
 			<div class="alignleft actions bulkactions">
 				<select v-model="this.query.per_page">
@@ -586,7 +624,13 @@ export default defineComponent( {
 	float: none;
 	margin-top: -10px;
 }
+.wp-header-sub {
+	display: flex;
+	align-items: center;
+}
 .subsubsub {
+	flex-grow: 1;
+	margin-top: 0;
 	.filter-list {
 		line-height: 2;
 		padding: .2em;
