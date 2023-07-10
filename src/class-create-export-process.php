@@ -171,6 +171,7 @@ Revisa la lista de páginas desactualizadas en el archivo adjunto a este correo.
 			'Última actualización',
 			'E-mail autor',
 			'Tiene enlaces entrantes',
+			'Dirección'
 		);
 		fputcsv( $fp, $headers );
 		$entries    = $this->get_export_entries( $params );
@@ -198,6 +199,7 @@ Revisa la lista de páginas desactualizadas en el archivo adjunto a este correo.
 				$post->post_modified,
 				get_user_by( 'id', $post->post_author )->user_email,
 				(bool) $page_check->any_check(),
+				get_permalink()
 			);
 			fputcsv( $fp, $row );
 		}
